@@ -15,15 +15,23 @@ A collection of commonly used **Object-Oriented Design Patterns** implemented an
 - [Decorator Pattern](#3-decorator-pattern)
 - [Proxy Pattern](#8-proxy-design-pattern)
 - [Composite Pattern](#12-composite-pattern)
+- [Adapter Pattern](#13-adapter-pattern)
+- [Facade Pattern](#14-facade-pattern)
+- [Bridge Pattern](#15-bridge-pattern)
 
 ### Creational Patterns
 - [Builder Pattern](#4-builder-pattern)
 - [Factory Pattern](#5-factory-pattern)
 - [Abstract Factory Pattern](#6-abstract-factory-pattern)
+- [Prototype Pattern](#16-prototype-pattern)
+- [Singleton Pattern](#17-singleton-pattern)
 
 ### Comparisons
 - [Builder vs Decorator](#builder-vs-decorator)
 - [Proxy vs Decorator](#proxy-vs-decorator)
+- [Facade vs Proxy](#facade-vs-proxy)
+- [Facade vs Adapter](#facade-vs-adapter)
+- [Bridge vs Strategy](#bridge-vs-strategy)
 - [Factory vs Abstract Factory vs Builder](#factory-vs-abstract-factory-vs-builder)
 
 ---
@@ -1415,6 +1423,18 @@ Choose properties step-by-step
 
 > Composes objects into tree structures to represent part-whole hierarchies uniformly.
 
+### Adapter
+
+> Converts the interface of a class into another interface clients expect, making incompatible interfaces work together.
+
+### Facade
+
+> Provides a unified, simplified interface to a set of interfaces in a subsystem, shielding clients from complexity.
+
+### Bridge
+
+> Decouples an abstraction from its implementation so the two can vary independently, preventing cartesian explosion.
+
 ## Creational Patterns
 
 ### Builder
@@ -1428,6 +1448,14 @@ Choose properties step-by-step
 ### Abstract Factory
 
 > Creates families of related objects without exposing their concrete implementations.
+
+### Prototype
+
+> Creates new objects by copying an existing object instead of creating from scratch, improving performance for expensive operations.
+
+### Singleton
+
+> Restricts instantiation of a class to a single object and provides a global point of access to it.
 
 ---
 
@@ -1928,3 +1956,732 @@ root.delete();  // Deletes all nested elements
 ## Key Idea
 
 > **Compose objects into tree structures to represent part-whole hierarchies. This allows clients to treat individual objects and compositions of objects uniformly.**
+---
+
+# 13. Adapter Pattern
+
+## Problem Statement
+
+Suppose we have a legacy system with an existing interface that a client uses.
+
+Now we have a new third-party library or module that we want to integrate, but its interface is incompatible.
+
+For example:
+
+```text
+Client expects: PaymentProcessor interface with process(amount)
+
+Existing Adapter: PaymentGateway with pay(value)
+
+Incompatible ✗
+```
+
+We cannot modify either the client code or the third-party library.
+
+## Solution
+
+Use the **Adapter Pattern** to create a bridge between the incompatible interfaces.
+
+Create an adapter that wraps the incompatible object and translates calls to the expected interface:
+
+```java
+interface PaymentProcessor {
+    void process(int amount);
+}
+
+class PaymentGateway {
+    public void pay(int value) {
+        System.out.println("Processing payment: " + value);
+    }
+}
+
+class PaymentProcessorAdapter implements PaymentProcessor {
+
+    private PaymentGateway gateway;
+
+    PaymentProcessorAdapter(PaymentGateway gateway) {
+        this.gateway = gateway;
+    }
+
+    @Override
+    public void process(int amount) {
+        // Adapt the call from process() to pay()
+        gateway.pay(amount);
+    }
+}
+```
+
+Now the client can use the adapter:
+
+```java
+PaymentGateway gateway = new PaymentGateway();
+PaymentProcessor processor = new PaymentProcessorAdapter(gateway);
+
+processor.process(100);  // Works seamlessly
+```
+
+## Two Types of Adapters
+
+### 1. Class Adapter (Using Inheritance)
+
+```java
+class PaymentProcessorAdapter extends PaymentGateway implements PaymentProcessor {
+
+    @Override
+    public void process(int amount) {
+        pay(amount);  // Call inherited method
+    }
+}
+```
+
+### 2. Object Adapter (Using Composition - Preferred)
+
+```java
+class PaymentProcessorAdapter implements PaymentProcessor {
+
+    private PaymentGateway gateway;
+
+    PaymentProcessorAdapter(PaymentGateway gateway) {
+        this.gateway = gateway;  // HAS-A relationship
+    }
+
+    @Override
+    public void process(int amount) {
+        gateway.pay(amount);
+    }
+}
+```
+
+## Key Idea
+
+> **Convert the interface of a class into another interface clients expect. This allows classes with incompatible interfaces to work together.**
+
+---
+
+# 14. Facade Pattern
+
+## Problem Statement
+
+Suppose we have a complex system with multiple interrelated components:
+
+```text
+Computer System
+├── CPU
+├── Memory
+├── HardDrive
+├── GraphicsCard
+├── PowerSupply
+└── Cooling
+```
+
+Starting a computer requires coordinating all these components:
+
+```java
+cpu.start();
+memory.initialize();
+hardDrive.spin();
+graphicsCard.enable();
+powerSupply.activate();
+cooling.start();
+```
+
+A client that wants to use the computer should not need to know all these internal details.
+
+## Solution
+
+Use the **Facade Pattern** to provide a simplified interface to the complex subsystem.
+
+```java
+class Computer {
+
+    private CPU cpu;
+    private Memory memory;
+    private HardDrive hardDrive;
+    private GraphicsCard graphicsCard;
+    private PowerSupply powerSupply;
+    private Cooling cooling;
+
+    Computer() {
+        this.cpu = new CPU();
+        this.memory = new Memory();
+        this.hardDrive = new HardDrive();
+        this.graphicsCard = new GraphicsCard();
+        this.powerSupply = new PowerSupply();
+        this.cooling = new Cooling();
+    }
+
+    // Simple interface that hides complexity
+    public void start() {
+        cpu.start();
+        memory.initialize();
+        hardDrive.spin();
+        graphicsCard.enable();
+        powerSupply.activate();
+        cooling.start();
+    }
+
+    public void shutdown() {
+        cpu.shutdown();
+        memory.shutdown();
+        hardDrive.stop();
+        graphicsCard.disable();
+        powerSupply.deactivate();
+        cooling.stop();
+    }
+}
+```
+
+Client code becomes simple:
+
+```java
+Computer computer = new Computer();
+computer.start();     // Handles all complexity internally
+computer.shutdown();
+```
+
+## Layered Facades
+
+Facades can use other facades:
+
+```java
+class SmartHome {
+
+    private Computer computer;
+    private ElectricalSystem electrical;
+    private HVAC hvac;
+
+    public void morningMode() {
+        computer.start();
+        electrical.enableLights();
+        hvac.setTemperature(21);
+    }
+}
+```
+
+## Key Idea
+
+> **Provide a unified, simplified interface to a set of interfaces in a subsystem. This shields clients from subsystem complexity and promotes loose coupling.**
+
+---
+
+# 15. Bridge Pattern
+
+## Problem Statement
+
+Suppose we have a hierarchy of devices:
+
+```text
+Device
+├── Mobile
+│   ├── Android
+│   └── iOS
+└── Laptop
+    ├── Windows
+    └── Mac
+```
+
+With inheritance, this leads to an exponential explosion of classes.
+
+For example:
+- `AndroidPhone`
+- `iPhonePhone`
+- `WindowsLaptop`
+- `MacLaptop`
+
+The problem worsens when we need to add new dimensions (e.g., screen types, processors, etc.).
+
+This is known as the **Cartesian Product Problem**.
+
+## Solution
+
+Use the **Bridge Pattern** to separate abstraction from implementation.
+
+Create separate hierarchies:
+
+### Implementation Hierarchy (Operating System)
+
+```java
+interface OS {
+    void bootUp();
+    void shutdown();
+}
+
+class AndroidOS implements OS {
+    @Override
+    public void bootUp() {
+        System.out.println("Booting Android...");
+    }
+
+    @Override
+    public void shutdown() {
+        System.out.println("Shutting down Android...");
+    }
+}
+
+class iOSOS implements OS {
+    @Override
+    public void bootUp() {
+        System.out.println("Booting iOS...");
+    }
+
+    @Override
+    public void shutdown() {
+        System.out.println("Shutting down iOS...");
+    }
+}
+```
+
+### Abstraction Hierarchy (Device Type)
+
+```java
+abstract class Device {
+
+    protected OS os;  // Bridge to implementation
+
+    Device(OS os) {
+        this.os = os;
+    }
+
+    public void powerOn() {
+        os.bootUp();
+    }
+
+    public void powerOff() {
+        os.shutdown();
+    }
+
+    public abstract void displaySpecs();
+}
+
+class Mobile extends Device {
+
+    Mobile(OS os) {
+        super(os);
+    }
+
+    @Override
+    public void displaySpecs() {
+        System.out.println("Mobile Device");
+        powerOn();
+    }
+}
+
+class Laptop extends Device {
+
+    Laptop(OS os) {
+        super(os);
+    }
+
+    @Override
+    public void displaySpecs() {
+        System.out.println("Laptop Device");
+        powerOn();
+    }
+}
+```
+
+Usage:
+
+```java
+Device androidPhone = new Mobile(new AndroidOS());
+androidPhone.displaySpecs();  // Mobile Device, Booting Android
+
+Device macLaptop = new Laptop(new iOSOS());
+macLaptop.displaySpecs();  // Laptop Device, Booting iOS
+```
+
+## Structure
+
+```text
+      Abstraction
+      (Device)
+      ↑  ↑
+      |  |
+   Mobile Laptop
+
+      Implementation
+      (OS)
+      ↑  ↑
+      |  |
+   Android iOS
+```
+
+Instead of creating 4 classes, we now have 4 classes without cartesian explosion.
+
+## Key Idea
+
+> **Decouple an abstraction from its implementation so the two can vary independently.**
+
+---
+
+# 16. Prototype Pattern
+
+## Problem Statement
+
+Suppose we have an expensive object to create (e.g., loading from database, complex calculations).
+
+If we need multiple copies of this object with slight variations, creating each from scratch is inefficient.
+
+For example:
+
+```java
+class Document {
+    String content;
+    int fontSize;
+    String fontFamily;
+    
+    Document() {
+        // Expensive initialization
+        this.content = loadFromDatabase();
+        this.fontSize = 12;
+    }
+}
+```
+
+Every time we create a new document, it performs expensive operations.
+
+## Solution
+
+Use the **Prototype Pattern** to clone existing objects instead of creating from scratch.
+
+Implement `Cloneable`:
+
+```java
+class Document implements Cloneable {
+
+    String content;
+    int fontSize;
+    String fontFamily;
+
+    Document() {
+        // Expensive initialization only once
+        this.content = "Default content";
+        this.fontSize = 12;
+        this.fontFamily = "Arial";
+    }
+
+    @Override
+    public Document clone() {
+        try {
+            return (Document) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void setFontSize(int fontSize) {
+        this.fontSize = fontSize;
+    }
+}
+```
+
+Usage:
+
+```java
+Document original = new Document();  // Expensive operation once
+
+Document copy1 = original.clone();   // Cheap - just copies
+copy1.setFontSize(14);
+
+Document copy2 = original.clone();
+copy2.setFontSize(16);
+```
+
+## Deep vs Shallow Copy
+
+### Shallow Copy (Default)
+
+```java
+public Object clone() {
+    return super.clone();  // Copies references
+}
+```
+
+### Deep Copy (For Complex Objects)
+
+```java
+@Override
+public Document clone() {
+    try {
+        Document cloned = (Document) super.clone();
+        cloned.content = new String(this.content);  // Deep copy mutable objects
+        return cloned;
+    } catch (CloneNotSupportedException e) {
+        throw new RuntimeException(e);
+    }
+}
+```
+
+## Benefits
+
+- Avoid expensive object creation
+- Efficient copying of complex objects
+- Avoids dependencies on concrete classes
+
+## Key Idea
+
+> **Create new objects by copying an existing object (prototype) instead of creating from scratch, improving performance when object creation is expensive.**
+
+---
+
+# 17. Singleton Pattern
+
+## Problem Statement
+
+Suppose we need an object that should exist only once throughout the application's lifetime.
+
+For example:
+- Database connection pool
+- Logger
+- Configuration manager
+- Thread pool
+
+Creating multiple instances would waste resources and cause inconsistency.
+
+## Solution
+
+Use the **Singleton Pattern** to ensure only one instance exists.
+
+### Eager Initialization
+
+```java
+class Singleton {
+
+    // Created at class loading time
+    private static final Singleton instance = new Singleton();
+
+    private Singleton() {
+    }
+
+    public static Singleton getInstance() {
+        return instance;
+    }
+}
+```
+
+**Pros:** Thread-safe by default, simple  
+**Cons:** Instance created even if not used
+
+### Lazy Initialization (Not Thread-Safe)
+
+```java
+class Singleton {
+
+    private static Singleton instance;
+
+    private Singleton() {
+    }
+
+    public static Singleton getInstance() {
+        if (instance == null) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+}
+```
+
+**Pros:** Instance created only when needed  
+**Cons:** Not thread-safe in multi-threaded environments
+
+### Synchronized Method (Thread-Safe but Slow)
+
+```java
+class Singleton {
+
+    private static Singleton instance;
+
+    private Singleton() {
+    }
+
+    public static synchronized Singleton getInstance() {
+        if (instance == null) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+}
+```
+
+**Pros:** Thread-safe  
+**Cons:** Every call is synchronized (performance penalty)
+
+### Double-Checked Locking (Industry Standard)
+
+```java
+class Singleton {
+
+    private static volatile Singleton instance;
+
+    private Singleton() {
+    }
+
+    public static Singleton getInstance() {
+        if (instance == null) {  // First check (without lock)
+            synchronized (Singleton.class) {
+                if (instance == null) {  // Second check (with lock)
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+## Why Use `volatile`?
+
+The double-checked locking pattern has two critical issues:
+
+### Issue 1: Instruction Reordering
+
+```text
+instance = new Singleton();
+
+Behind the scenes, the CPU performs:
+1. Allocate memory
+2. Initialize fields  ← Reordering can happen here
+3. Assign reference to instance
+
+If reordering occurs:
+1. Allocate memory
+3. Assign reference to instance  (before initialization!)
+2. Initialize fields
+
+Another thread sees instance != null and uses it with default values
+```
+
+**Solution:** `volatile` keyword prevents instruction reordering.
+
+### Issue 2: L1 Cache Synchronization
+
+```text
+Thread 1: Creates instance, it sits in L1 cache
+          ↓ (hasn't synced with main memory yet)
+Thread 2: Checks main memory, sees null
+         Creates another instance ✗
+
+Core-1 L1 Cache     Core-2 L1 Cache
+    ↑                   ↑
+    └─────────────────┬─────────────────┘
+                      ↓
+                  Main Memory
+```
+
+**Solution:** `volatile` keyword forces write to main memory and read from main memory.
+
+### How `volatile` Solves Both Issues
+
+```java
+private static volatile Singleton instance;
+```
+
+**Properties of `volatile`:**
+
+1. **Forces Memory Visibility:** Every read/write goes to main memory, not just cache
+2. **Prevents Instruction Reordering:** All instructions before `volatile` complete before `volatile` executes, and all instructions after wait for `volatile` to complete
+
+```
+Before volatile ────┐
+                    │ All complete
+                    ↓
+              volatile write/read
+                    ↑
+Before after volatile ┘
+```
+
+### Enum (Simplest Thread-Safe Solution)
+
+```java
+enum Singleton {
+    INSTANCE;
+
+    public void doSomething() {
+        // Implementation
+    }
+}
+
+// Usage
+Singleton.INSTANCE.doSomething();
+```
+
+**Pros:**
+- Thread-safe by default
+- Serialization-safe
+- Reflection-proof
+- Simplest code
+
+**Cons:** Less flexible than class-based approach
+
+## Comparison of Singleton Implementations
+
+| Approach | Thread-Safe | Lazy | Performance | Reflection-Safe |
+|----------|:----------:|:----:|:-----------:|:---------------:|
+| Eager | ✓ | ✗ | Fast | ✗ |
+| Synchronized | ✓ | ✓ | Slow | ✗ |
+| Double-Checked | ✓ | ✓ | Fast | ✗ |
+| Enum | ✓ | ✗ | Fast | ✓ |
+
+## Key Idea
+
+> **Restrict the instantiation of a class to a single object and provide a global point of access to it.**
+
+---
+
+# Facade vs Proxy
+
+| Aspect | Facade | Proxy |
+|--------|--------|-------|
+| **Purpose** | Simplifies a complex system | Controls access to an object |
+| **Number of Objects** | Multiple subsystems | Single object |
+| **Focus** | Reduces complexity | Controls behavior |
+| **Relationship** | HAS-A with subsystems | HAS-A with wrapped object |
+| **Use Case** | Hide system complexity | Add functionality (caching, auth) |
+
+**Easy Way to Remember:**
+
+**Facade:**
+> "I'm a receptionist who handles all your interactions with the complex company behind me."
+
+**Proxy:**
+> "I'm a security guard who stands in front of one specific person and decides if you can talk to them."
+
+---
+
+# Facade vs Adapter
+
+| Aspect | Facade | Adapter |
+|--------|--------|---------|
+| **Purpose** | Simplify complex interface | Make incompatible interfaces compatible |
+| **Problem** | Too many subsystems to manage | Interfaces don't match |
+| **Approach** | Hide complexity | Bridge the gap |
+| **Client Expectation** | Wants simple interface | Wants to use existing interface |
+
+**Easy Way to Remember:**
+
+**Facade:**
+> "Let me hide all this complexity behind a simple door."
+
+**Adapter:**
+> "Let me convert this plug so it works with your socket."
+
+---
+
+# Bridge vs Strategy
+
+| Aspect | Bridge | Strategy |
+|--------|--------|----------|
+| **Focus** | Separates abstraction from implementation | Encapsulates interchangeable algorithms |
+| **Problem** | Cartesian explosion of classes | Multiple ways to do the same task |
+| **Dimensions** | Two independent hierarchies | One hierarchy with behavior variations |
+| **Change Type** | Change implementation | Change algorithm at runtime |
+
+**Easy Way to Remember:**
+
+**Bridge:**
+> "I have different device types AND different operating systems. I need both to vary independently."
+
+**Strategy:**
+> "I have one object but different ways it can behave. I choose the behavior based on context."
+
+---
