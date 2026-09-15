@@ -10,6 +10,10 @@ A collection of commonly used **Object-Oriented Design Patterns** implemented an
 - [State Pattern](#9-state-pattern)
 - [Chain of Responsibility Pattern](#10-chain-of-responsibility-pattern)
 - [Null Object Pattern](#11-null-object-pattern)
+- [Command Pattern](#18-command-pattern)
+- [Iterator Pattern](#19-iterator-pattern)
+- [Mediator Pattern](#20-mediator-pattern)
+- [Visitor Pattern](#21-visitor-pattern)
 
 ### Structural Patterns
 - [Decorator Pattern](#3-decorator-pattern)
@@ -18,6 +22,7 @@ A collection of commonly used **Object-Oriented Design Patterns** implemented an
 - [Adapter Pattern](#13-adapter-pattern)
 - [Facade Pattern](#14-facade-pattern)
 - [Bridge Pattern](#15-bridge-pattern)
+- [Flyweight Pattern](#22-flyweight-pattern)
 
 ### Creational Patterns
 - [Builder Pattern](#4-builder-pattern)
@@ -1409,6 +1414,22 @@ Choose properties step-by-step
 
 > Provides a neutral object as a substitute for null, eliminating the need for null checks.
 
+### Command
+
+> Encapsulates a request as an object, allowing parameterization of clients with different requests, queuing, and support for undo/redo operations.
+
+### Iterator
+
+> Provides a way to access elements of a collection sequentially without exposing its underlying representation.
+
+### Mediator
+
+> Defines an object that encapsulates how a set of objects interact, promoting loose coupling by keeping objects from referring to each other explicitly.
+
+### Visitor
+
+> Represents an operation to be performed on elements of an object structure, allowing new operations to be added without changing the structure.
+
 ## Structural Patterns
 
 ### Decorator
@@ -1434,6 +1455,10 @@ Choose properties step-by-step
 ### Bridge
 
 > Decouples an abstraction from its implementation so the two can vary independently, preventing cartesian explosion.
+
+### Flyweight
+
+> Uses sharing to support large numbers of fine-grained objects efficiently by sharing common state among multiple objects.
 
 ## Creational Patterns
 
@@ -2683,5 +2708,1151 @@ Singleton.INSTANCE.doSomething();
 
 **Strategy:**
 > "I have one object but different ways it can behave. I choose the behavior based on context."
+
+---
+
+# 18. Command Pattern
+
+## Problem Statement
+
+Suppose we have a text editor with various operations:
+- Save
+- Print
+- Undo
+- Redo
+
+If each operation is implemented directly in the editor class, it becomes:
+- Tightly coupled
+- Difficult to add new operations
+- Hard to implement undo/redo functionality
+- No separation between the invoker (button) and the receiver (editor)
+
+For example:
+```java
+class TextEditor {
+    public void save() { /* implementation */ }
+    public void print() { /* implementation */ }
+}
+
+class Button {
+    public void onClick() {
+        editor.save();  // Tight coupling
+    }
+}
+```
+
+## Solution
+
+Use the **Command Pattern** to encapsulate requests as objects.
+
+### 1. Define Command Interface
+
+```java
+interface Command {
+    void execute();
+    void undo();
+}
+```
+
+### 2. Create Concrete Commands
+
+```java
+class SaveCommand implements Command {
+
+    private TextEditor editor;
+
+    SaveCommand(TextEditor editor) {
+        this.editor = editor;
+    }
+
+    @Override
+    public void execute() {
+        editor.save();
+    }
+
+    @Override
+    public void undo() {
+        editor.undoSave();
+    }
+}
+
+class PrintCommand implements Command {
+
+    private TextEditor editor;
+
+    PrintCommand(TextEditor editor) {
+        this.editor = editor;
+    }
+
+    @Override
+    public void execute() {
+        editor.print();
+    }
+
+    @Override
+    public void undo() {
+        // Print cannot be undone
+        System.out.println("Cannot undo print");
+    }
+}
+```
+
+### 3. Receiver (TextEditor)
+
+```java
+class TextEditor {
+
+    private String content = "Sample content";
+
+    public void save() {
+        System.out.println("Saving: " + content);
+    }
+
+    public void print() {
+        System.out.println("Printing: " + content);
+    }
+
+    public void undoSave() {
+        System.out.println("Undo save operation");
+    }
+}
+```
+
+### 4. Invoker (Button/Menu)
+
+```java
+class Button {
+
+    private Command command;
+
+    Button(Command command) {
+        this.command = command;
+    }
+
+    public void click() {
+        command.execute();
+    }
+}
+```
+
+### 5. Usage
+
+```java
+TextEditor editor = new TextEditor();
+
+Command saveCmd = new SaveCommand(editor);
+Command printCmd = new PrintCommand(editor);
+
+Button saveButton = new Button(saveCmd);
+Button printButton = new Button(printCmd);
+
+saveButton.click();   // Calls SaveCommand.execute()
+printButton.click();  // Calls PrintCommand.execute()
+```
+
+## Implementing Undo/Redo
+
+```java
+class CommandInvoker {
+
+    private Stack<Command> history = new Stack<>();
+    private Stack<Command> redoStack = new Stack<>();
+
+    public void execute(Command command) {
+        command.execute();
+        history.push(command);
+        redoStack.clear();  // Clear redo stack on new command
+    }
+
+    public void undo() {
+        if (!history.isEmpty()) {
+            Command command = history.pop();
+            command.undo();
+            redoStack.push(command);
+        }
+    }
+
+    public void redo() {
+        if (!redoStack.isEmpty()) {
+            Command command = redoStack.pop();
+            command.execute();
+            history.push(command);
+        }
+    }
+}
+```
+
+## Benefits
+
+- Decouples invoker from receiver
+- Encapsulates requests as objects
+- Supports undo/redo functionality
+- Allows queuing and logging of commands
+- Easy to add new commands
+
+## Common Use Cases
+
+- Text editor operations (save, undo, redo)
+- GUI buttons and menu items
+- Transaction management
+- Macro recording
+- Queuing and scheduling
+- Logging and auditing
+
+## Key Idea
+
+> **Encapsulate a request as an object, allowing you to parameterize clients with different requests, queue requests, and support undoable operations.**
+
+---
+
+# 19. Iterator Pattern
+
+## Problem Statement
+
+Suppose we have different collection types:
+- Array
+- LinkedList
+- Set
+- HashTable
+
+Each collection has a different internal structure. If a client wants to iterate through any collection, they need to know:
+- How the collection stores data
+- How to access elements
+
+This violates encapsulation and couples the client to the collection's implementation.
+
+```java
+// Client must know internal structure
+if (collection instanceof Array) {
+    for (int i = 0; i < array.length; i++) {
+        process(array[i]);
+    }
+} else if (collection instanceof LinkedList) {
+    Node current = linkedList.getFirst();
+    while (current != null) {
+        process(current.value);
+        current = current.next;
+    }
+}
+```
+
+## Solution
+
+Use the **Iterator Pattern** to provide a unified way to traverse collections.
+
+### 1. Define Iterator Interface
+
+```java
+interface Iterator<T> {
+    boolean hasNext();
+    T next();
+    void remove();
+}
+```
+
+### 2. Define Collection Interface
+
+```java
+interface Collection<T> {
+    Iterator<T> iterator();
+}
+```
+
+### 3. Implement Iterator for Array
+
+```java
+class ArrayIterator<T> implements Iterator<T> {
+
+    private T[] items;
+    private int index = 0;
+
+    ArrayIterator(T[] items) {
+        this.items = items;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return index < items.length;
+    }
+
+    @Override
+    public T next() {
+        if (!hasNext()) {
+            throw new NoSuchElementException();
+        }
+        return items[index++];
+    }
+
+    @Override
+    public void remove() {
+        // Array removal is complex, might not support
+    }
+}
+```
+
+### 4. Implement Iterator for LinkedList
+
+```java
+class LinkedListIterator<T> implements Iterator<T> {
+
+    private Node<T> current;
+
+    LinkedListIterator(Node<T> head) {
+        this.current = head;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return current != null;
+    }
+
+    @Override
+    public T next() {
+        if (!hasNext()) {
+            throw new NoSuchElementException();
+        }
+        T value = current.value;
+        current = current.next;
+        return value;
+    }
+
+    @Override
+    public void remove() {
+        // LinkedList removal is simpler
+    }
+}
+```
+
+### 5. Collection Implementations
+
+```java
+class MyArray<T> implements Collection<T> {
+
+    private T[] items;
+
+    MyArray(T[] items) {
+        this.items = items;
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+        return new ArrayIterator<>(items);
+    }
+}
+
+class MyLinkedList<T> implements Collection<T> {
+
+    private Node<T> head;
+
+    @Override
+    public Iterator<T> iterator() {
+        return new LinkedListIterator<>(head);
+    }
+}
+```
+
+### 6. Unified Client Code
+
+```java
+Collection<Integer> array = new MyArray<>(new Integer[]{1, 2, 3});
+Collection<Integer> linkedList = new MyLinkedList<>();
+
+// Same client code works for any collection
+for (Iterator<Integer> it = array.iterator(); it.hasNext(); ) {
+    System.out.println(it.next());
+}
+
+for (Iterator<Integer> it = linkedList.iterator(); it.hasNext(); ) {
+    System.out.println(it.next());
+}
+
+// Or using enhanced for loop (if Iterable is implemented)
+for (Integer item : array) {
+    System.out.println(item);
+}
+```
+
+## Key Idea
+
+> **Provide a way to access the elements of an object sequentially without exposing its underlying representation.**
+
+---
+
+# 20. Mediator Pattern
+
+## Problem Statement
+
+Suppose we have an online auction system with multiple components:
+- `User`
+- `Auction`
+- `Bid`
+- `Payment`
+- `Notification`
+
+These components interact with each other:
+
+```
+User ---> Auction <--- Bid
+  ^         ^          ^
+  |         |          |
+  +-----+---+-----+----+
+        |
+    Payment
+```
+
+If every component communicates directly with every other:
+- Complex interconnections (mesh network)
+- Difficult to modify one component without affecting others
+- Hard to reuse components
+- Difficult to test
+
+## Solution
+
+Use the **Mediator Pattern** to centralize communication through a mediator.
+
+```
+User     Bid     Auction
+  \      |       /
+   \     |      /
+    \    |     /
+     \   |    /
+      \  |   /
+       \ |  /
+        \| /
+      AuctionMediator
+        / | \
+       /  |  \
+    Payment Notification
+```
+
+### 1. Define Component Interface
+
+```java
+interface Component {
+    void setMediator(Mediator mediator);
+}
+```
+
+### 2. Define Mediator Interface
+
+```java
+interface Mediator {
+    void placeBid(User user, int amount);
+    void acceptBid(Auction auction, Bid bid);
+    void processPayment(Payment payment);
+    void notifyUser(User user, String message);
+}
+```
+
+### 3. Implement Components
+
+```java
+class User implements Component {
+
+    private String name;
+    private Mediator mediator;
+
+    User(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void setMediator(Mediator mediator) {
+        this.mediator = mediator;
+    }
+
+    public void bid(int amount) {
+        System.out.println(name + " wants to bid " + amount);
+        mediator.placeBid(this, amount);
+    }
+
+    public void receiveNotification(String message) {
+        System.out.println(name + " received: " + message);
+    }
+}
+
+class Auction implements Component {
+
+    private Mediator mediator;
+
+    @Override
+    public void setMediator(Mediator mediator) {
+        this.mediator = mediator;
+    }
+
+    public void endAuction(Bid highestBid) {
+        mediator.acceptBid(this, highestBid);
+    }
+}
+```
+
+### 4. Implement Concrete Mediator
+
+```java
+class AuctionMediator implements Mediator {
+
+    private Bid highestBid;
+    private List<User> users = new ArrayList<>();
+
+    public void registerUser(User user) {
+        user.setMediator(this);
+        users.add(user);
+    }
+
+    @Override
+    public void placeBid(User user, int amount) {
+        if (highestBid == null || amount > highestBid.getAmount()) {
+            highestBid = new Bid(user, amount);
+            notifyAllUsers(user.getName() + " has the highest bid: " + amount);
+        } else {
+            notifyUser(user, "Bid is too low");
+        }
+    }
+
+    @Override
+    public void acceptBid(Auction auction, Bid bid) {
+        System.out.println("Bid accepted: " + bid.getAmount());
+        processPayment(new Payment(bid));
+    }
+
+    @Override
+    public void processPayment(Payment payment) {
+        System.out.println("Processing payment: " + payment.getAmount());
+        notifyAllUsers("Payment processed successfully");
+    }
+
+    @Override
+    public void notifyUser(User user, String message) {
+        user.receiveNotification(message);
+    }
+
+    private void notifyAllUsers(String message) {
+        for (User user : users) {
+            user.receiveNotification(message);
+        }
+    }
+}
+```
+
+### 5. Usage
+
+```java
+AuctionMediator mediator = new AuctionMediator();
+
+User user1 = new User("Alice");
+User user2 = new User("Bob");
+User user3 = new User("Charlie");
+
+mediator.registerUser(user1);
+mediator.registerUser(user2);
+mediator.registerUser(user3);
+
+user1.bid(100);  // Alice bids 100
+user2.bid(150);  // Bob bids 150
+user1.bid(200);  // Alice bids 200
+```
+
+## Mediator vs Observer
+
+| Aspect | Mediator | Observer |
+|--------|----------|----------|
+| **Relationship** | Many-to-Many | One-to-Many |
+| **Coupling** | Objects coupled to mediator | Objects coupled to subject |
+| **Communication** | Through mediator | Direct notifications |
+| **Control** | Mediator controls interaction | Subject controls notification |
+| **Use Case** | Complex interactions | Simple notifications |
+
+## Key Idea
+
+> **Define an object that encapsulates how a set of objects interact, promoting loose coupling by keeping objects from referring to each other explicitly and letting you vary their interaction independently.**
+
+---
+
+# 21. Visitor Pattern
+
+## Problem Statement
+
+Suppose we have a document structure with different elements:
+- `Text`
+- `Image`
+- `Table`
+- `Heading`
+
+Now we need to perform various operations on these elements:
+- Export to PDF
+- Export to HTML
+- Export to XML
+- Count characters
+- Validate content
+
+If we add methods directly to each class:
+
+```java
+class Text {
+    public void exportToPDF() { /* */ }
+    public void exportToHTML() { /* */ }
+    public void exportToXML() { /* */ }
+    public int countCharacters() { /* */ }
+}
+
+class Image {
+    public void exportToPDF() { /* */ }
+    public void exportToHTML() { /* */ }
+    public void exportToXML() { /* */ }
+}
+```
+
+This leads to:
+- **Class explosion** with many methods
+- **Violates Single Responsibility Principle** - each class does too much
+- **Difficult to add new operations** - requires modifying all classes
+
+## Solution
+
+Use the **Visitor Pattern** to add new operations without modifying the class structure.
+
+### 1. Define Element Interface
+
+```java
+interface DocumentElement {
+    void accept(Visitor visitor);
+}
+```
+
+### 2. Define Visitor Interface
+
+```java
+interface Visitor {
+    void visit(Text text);
+    void visit(Image image);
+    void visit(Table table);
+}
+```
+
+### 3. Implement Concrete Elements
+
+```java
+class Text implements DocumentElement {
+
+    private String content;
+
+    Text(String content) {
+        this.content = content;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    @Override
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
+}
+
+class Image implements DocumentElement {
+
+    private String fileName;
+
+    Image(String fileName) {
+        this.fileName = fileName;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    @Override
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
+}
+
+class Table implements DocumentElement {
+
+    private int rows, columns;
+
+    Table(int rows, int columns) {
+        this.rows = rows;
+        this.columns = columns;
+    }
+
+    public int getRows() { return rows; }
+    public int getColumns() { return columns; }
+
+    @Override
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
+}
+```
+
+### 4. Implement Concrete Visitors
+
+```java
+class PDFExporter implements Visitor {
+
+    @Override
+    public void visit(Text text) {
+        System.out.println("Exporting text to PDF: " + text.getContent());
+    }
+
+    @Override
+    public void visit(Image image) {
+        System.out.println("Exporting image to PDF: " + image.getFileName());
+    }
+
+    @Override
+    public void visit(Table table) {
+        System.out.println("Exporting table to PDF: " + table.getRows() + "x" + table.getColumns());
+    }
+}
+
+class HTMLExporter implements Visitor {
+
+    @Override
+    public void visit(Text text) {
+        System.out.println("<p>" + text.getContent() + "</p>");
+    }
+
+    @Override
+    public void visit(Image image) {
+        System.out.println("<img src='" + image.getFileName() + "' />");
+    }
+
+    @Override
+    public void visit(Table table) {
+        System.out.println("<table rows=" + table.getRows() + " cols=" + table.getColumns() + " />");
+    }
+}
+
+class CharacterCounter implements Visitor {
+
+    private int totalCharacters = 0;
+
+    @Override
+    public void visit(Text text) {
+        totalCharacters += text.getContent().length();
+    }
+
+    @Override
+    public void visit(Image image) {
+        // Images don't have characters
+    }
+
+    @Override
+    public void visit(Table table) {
+        // Tables don't directly have characters
+    }
+
+    public int getTotalCharacters() {
+        return totalCharacters;
+    }
+}
+```
+
+### 5. Usage
+
+```java
+List<DocumentElement> document = new ArrayList<>();
+document.add(new Text("Hello World"));
+document.add(new Image("photo.jpg"));
+document.add(new Table(3, 4));
+
+// Export to PDF
+Visitor pdfExporter = new PDFExporter();
+for (DocumentElement element : document) {
+    element.accept(pdfExporter);
+}
+
+// Export to HTML
+Visitor htmlExporter = new HTMLExporter();
+for (DocumentElement element : document) {
+    element.accept(htmlExporter);
+}
+
+// Count characters
+CharacterCounter counter = new CharacterCounter();
+for (DocumentElement element : document) {
+    element.accept(counter);
+}
+System.out.println("Total characters: " + counter.getTotalCharacters());
+```
+
+## Benefits
+
+- Add new operations without modifying element classes
+- Keeps operations and data structures separate
+- Easy to add new visitors
+- Follows Single Responsibility Principle
+
+## Drawbacks
+
+- Difficult to add new element types (requires modifying all visitors)
+- More complex than direct methods
+
+## Key Idea
+
+> **Represent an operation to be performed on elements of an object structure. Visitor lets you define a new operation without changing the classes of the elements on which it operates.**
+
+---
+
+# 22. Flyweight Pattern
+
+## Problem Statement
+
+Suppose we have a text editor displaying a document with thousands of characters.
+
+Each character object stores:
+
+```java
+class Character {
+    char value;           // e.g., 'A'
+    int fontSize;         // 12
+    String fontFamily;    // "Arial"
+    int positionX;        // Where it appears on screen
+    int positionY;        // Where it appears on screen
+    Color color;          // Red
+}
+```
+
+If the document has 100,000 characters, and most characters are 'A' in Arial font size 12, we're wasting memory storing:
+- Duplicate font information
+- Duplicate size information
+- Duplicate color information
+
+This can lead to **memory exhaustion**.
+
+## Solution
+
+Use the **Flyweight Pattern** to share common data.
+
+Separate data into:
+- **Intrinsic State** (shared): Font family, font size, color - data that is the same for many objects
+- **Extrinsic State** (unique): Position X, Position Y - data that is different for each object
+
+### 1. Flyweight Object (Shared)
+
+```java
+class CharacterFlyweight {
+
+    private char value;
+    private String fontFamily;
+    private int fontSize;
+    private Color color;
+
+    CharacterFlyweight(char value, String fontFamily, int fontSize, Color color) {
+        this.value = value;
+        this.fontFamily = fontFamily;
+        this.fontSize = fontSize;
+        this.color = color;
+    }
+
+    public void render(int positionX, int positionY) {
+        System.out.println("Rendering '" + value + "' at (" + positionX + "," + positionY + 
+                          ") with " + fontFamily + " " + fontSize + "pt");
+    }
+}
+```
+
+### 2. Flyweight Factory
+
+```java
+class CharacterFactory {
+
+    private Map<String, CharacterFlyweight> flyweights = new HashMap<>();
+
+    public CharacterFlyweight getCharacter(char value, String fontFamily, int fontSize, Color color) {
+        String key = value + fontFamily + fontSize + color;
+
+        if (!flyweights.containsKey(key)) {
+            flyweights.put(key, new CharacterFlyweight(value, fontFamily, fontSize, color));
+        }
+
+        return flyweights.get(key);
+    }
+
+    public int getFlyweightCount() {
+        return flyweights.size();
+    }
+}
+```
+
+### 3. Context (Extrinsic State)
+
+```java
+class CharacterContext {
+
+    private CharacterFlyweight flyweight;
+    private int positionX;
+    private int positionY;
+
+    CharacterContext(CharacterFlyweight flyweight, int positionX, int positionY) {
+        this.flyweight = flyweight;
+        this.positionX = positionX;
+        this.positionY = positionY;
+    }
+
+    public void render() {
+        flyweight.render(positionX, positionY);
+    }
+}
+```
+
+### 4. Usage
+
+```java
+CharacterFactory factory = new CharacterFactory();
+
+List<CharacterContext> document = new ArrayList<>();
+
+// Add 100,000 'A' characters in Arial
+for (int i = 0; i < 100000; i++) {
+    CharacterFlyweight flyweight = factory.getCharacter('A', "Arial", 12, Color.BLACK);
+    document.add(new CharacterContext(flyweight, i * 10, 0));
+}
+
+// Only 1 flyweight object for 'A' in Arial!
+System.out.println("Flyweight objects created: " + factory.getFlyweightCount());  // Output: 1
+
+// Render a few characters
+for (int i = 0; i < 10; i++) {
+    document.get(i).render();
+}
+```
+
+## Memory Optimization
+
+**Without Flyweight:**
+```
+100,000 Character objects × 50 bytes each = 5 MB
+```
+
+**With Flyweight:**
+```
+1 CharacterFlyweight object × 50 bytes = 50 bytes
+100,000 CharacterContext objects × 8 bytes (reference + 2 ints) = 800 KB
+Total: ~800 KB (84% memory savings!)
+```
+
+## When to Use Flyweight
+
+1. **Many similar objects** - Thousands or millions
+2. **Memory constraints** - Limited memory available
+3. **Immutable shared data** - Intrinsic state doesn't change
+4. **Can separate state** - Intrinsic and extrinsic data can be separated
+
+## Common Use Cases
+
+- Text editors (characters)
+- Games (particles, trees, textures)
+- Web browsers (fonts, styles)
+- Map applications (map tiles)
+- Caching of frequently used objects
+
+## Key Idea
+
+> **Use sharing to support large numbers of fine-grained objects efficiently by sharing common state between multiple objects, thereby reducing memory consumption.**
+
+---
+
+---
+
+# Mediator vs Observer vs Proxy
+
+| Aspect | Mediator | Observer | Proxy |
+|--------|----------|----------|-------|
+| **Purpose** | Centralize complex interactions | Notify dependents of changes | Control access to object |
+| **Relationship** | Many-to-Many | One-to-Many | One-to-One |
+| **Communication** | Through mediator | Direct notifications | Through proxy |
+| **Coupling** | Objects coupled to mediator | Objects coupled to subject | Client coupled to proxy |
+| **Use Case** | Complex business logic | Event notifications | Access control, caching |
+
+**Easy Way to Remember:**
+
+**Mediator:**
+> "I'm the post office. Everyone sends their mail to me, and I deliver it to the right person."
+
+**Observer:**
+> "I'm a notification service. When something happens, I notify all who are interested."
+
+**Proxy:**
+> "I'm a gatekeeper for one specific object. I control who can access it and what they can do."
+
+---
+
+# Iterator vs Visitor
+
+| Aspect | Iterator | Visitor |
+|--------|----------|---------|
+| **Purpose** | Traverse a collection | Perform operations on elements |
+| **Focus** | How to access elements | What operations to perform |
+| **Structure** | Single collection | Multiple different operations |
+| **Element Modification** | May modify elements | Typically read-only |
+| **Adding New Features** | No | Yes (new visitors) |
+
+**Easy Way to Remember:**
+
+**Iterator:**
+> "I help you go through each item in a collection one by one, without knowing the collection's structure."
+
+**Visitor:**
+> "I let you add new things you can do with items, without changing the items themselves."
+
+---
+
+# Command vs Strategy
+
+| Aspect | Command | Strategy |
+|--------|---------|----------|
+| **Purpose** | Encapsulate a request | Encapsulate an algorithm |
+| **Focus** | What to do (execution) | How to do it (algorithm choice) |
+| **Queue/Log** | Yes | No |
+| **Undo/Redo** | Yes | No |
+| **Timing** | Can be deferred | Immediate execution |
+
+**Easy Way to Remember:**
+
+**Command:**
+> "I package up a request to do something, store it, and maybe do it later or undo it."
+
+**Strategy:**
+> "I let you pick how to solve a problem, but I solve it right now."
+
+---
+
+# Flyweight vs Object Pool
+
+| Aspect | Flyweight | Object Pool |
+|--------|-----------|-------------|
+| **Purpose** | Share intrinsic state | Reuse expensive objects |
+| **Sharing** | Direct sharing of objects | Reuse from pool |
+| **State** | Immutable intrinsic state | Stateful objects |
+| **Memory** | Reduced via sharing | Reduced via reuse |
+| **Complexity** | Separate intrinsic/extrinsic | Manage pool lifecycle |
+| **Use Case** | Immutable data (fonts, colors) | Expensive resources (threads, connections) |
+
+---
+
+# Design Pattern Quick Reference
+
+## Pattern Selection Guide
+
+### Need to handle complex object creation?
+→ **Builder** (step-by-step configuration)  
+→ **Factory** (hide creation logic)  
+→ **Abstract Factory** (families of objects)  
+→ **Prototype** (copy existing objects)
+
+### Need to manage state or behavior?
+→ **Strategy** (interchangeable algorithms)  
+→ **State** (different behavior per state)  
+→ **Command** (encapsulate requests with undo/redo)  
+→ **Visitor** (add operations to structures)
+
+### Need to simplify complexity?
+→ **Facade** (simplify subsystem)  
+→ **Adapter** (make incompatible interfaces work)  
+→ **Bridge** (separate abstraction/implementation)  
+→ **Composite** (tree structures)
+
+### Need to manage object relationships?
+→ **Observer** (one-to-many notifications)  
+→ **Mediator** (many-to-many interactions)  
+→ **Iterator** (traverse collections)  
+→ **Proxy** (control access to one object)
+
+### Need to optimize resources?
+→ **Flyweight** (share intrinsic state)  
+→ **Singleton** (one instance globally)  
+→ **Object Pool** (reuse expensive objects)
+
+### Need to add capabilities without modification?
+→ **Decorator** (wrap objects dynamically)  
+→ **Proxy** (add access control)
+
+---
+
+# Common Mistakes and Best Practices
+
+## Singleton Pattern
+
+❌ **Wrong:**
+```java
+private static Singleton instance;
+public static Singleton getInstance() {
+    if (instance == null) {
+        instance = new Singleton();
+    }
+    return instance;
+}
+```
+Not thread-safe!
+
+✅ **Right:**
+```java
+private static volatile Singleton instance;
+public static Singleton getInstance() {
+    if (instance == null) {
+        synchronized (Singleton.class) {
+            if (instance == null) {
+                instance = new Singleton();
+            }
+        }
+    }
+    return instance;
+}
+```
+Or use Enum for simplicity.
+
+## Observer Pattern
+
+❌ **Wrong:**
+```java
+observer.update(this, null);  // Passing vague data
+```
+
+✅ **Right:**
+```java
+observer.update(this, new WeatherData(temp, humidity));  // Specific data
+```
+
+## Factory Pattern
+
+❌ **Wrong:**
+```java
+String type = getUserInput();
+if (type.equals("PDF")) {
+    // Create PDF exporter
+} else if (type.equals("Excel")) {
+    // Create Excel exporter
+}
+// Repeated in multiple places
+```
+
+✅ **Right:**
+```java
+ExporterFactory factory = new ExporterFactory();
+Exporter exporter = factory.createExporter(type);
+exporter.export(data);
+```
+
+## Decorator vs Inheritance
+
+❌ **Wrong:**
+```java
+class CoffeWithMilk extends Coffee {}
+class CoffeWithSugarAndMilk extends Coffee {}
+class CoffeWithWhippedCreamAndSugarAndMilk extends Coffee {}
+// Class explosion!
+```
+
+✅ **Right:**
+```java
+Coffee coffee = new SimpleCoffee();
+coffee = new MilkDecorator(coffee);
+coffee = new SugarDecorator(coffee);
+coffee = new WhippedCreamDecorator(coffee);
+```
 
 ---
